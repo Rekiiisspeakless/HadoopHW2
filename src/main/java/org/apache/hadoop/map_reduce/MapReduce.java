@@ -219,7 +219,7 @@ public static class OutputMapper
 public static void main(String[] args) throws Exception {
     Configuration conf = new Configuration();
     String[] otherArgs = new GenericOptionsParser(conf, args).getRemainingArgs();
-    if (otherArgs.length != 5) {
+    if (otherArgs.length != 2) {
         System.err.println("Usage: map_reduce <in> <out>");
         System.exit(2);
     }
@@ -242,7 +242,7 @@ public static void main(String[] args) throws Exception {
     job.setOutputValueClass(MyValuePair.class);*/
 
     FileInputFormat.addInputPath(job1, new Path(otherArgs[0]));
-    FileOutputFormat.setOutputPath(job1, new Path(otherArgs[1]));
+    FileOutputFormat.setOutputPath(job1, new Path("/user/root/data/hw2/map"));
 
     ////////////////////loop start//////////////////////////
 
@@ -263,8 +263,8 @@ public static void main(String[] args) throws Exception {
     /*job.setOutputKeyClass(MyKeyPair.class);
     job.setOutputValueClass(MyValuePair.class);*/
 
-    FileInputFormat.addInputPath(job2, new Path(otherArgs[1]));
-    FileOutputFormat.setOutputPath(job2, new Path(otherArgs[2]));
+    FileInputFormat.addInputPath(job2, new Path("/user/root/data/hw2"));
+    FileOutputFormat.setOutputPath(job2, new Path("/user/root/data/hw2"));
 
     ////////////////////////job3///////////////////////////
 
@@ -283,8 +283,8 @@ public static void main(String[] args) throws Exception {
     /*job.setOutputKeyClass(MyKeyPair.class);
     job.setOutputValueClass(MyValuePair.class);*/
 
-    FileInputFormat.addInputPath(job3, new Path(otherArgs[2]));
-    FileOutputFormat.setOutputPath(job3, new Path(otherArgs[3]));
+    FileInputFormat.addInputPath(job3, new Path("/user/root/data/hw2"));
+    FileOutputFormat.setOutputPath(job3, new Path("/user/root/data/hw2"));
 
     /////////////////////job4/////////////////////////////
     Job job4 = new Job(conf, "output page rank");
@@ -302,8 +302,8 @@ public static void main(String[] args) throws Exception {
     /*job.setOutputKeyClass(MyKeyPair.class);
     job.setOutputValueClass(MyValuePair.class);*/
 
-    FileInputFormat.addInputPath(job4, new Path(otherArgs[3]));
-    FileOutputFormat.setOutputPath(job4, new Path(otherArgs[4]));
+    FileInputFormat.addInputPath(job4, new Path("/user/root/data/hw2"));
+    FileOutputFormat.setOutputPath(job4, new Path(otherArgs[1]));
 
 
 
