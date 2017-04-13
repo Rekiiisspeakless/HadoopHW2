@@ -147,12 +147,19 @@ public static class IntSumReducer
             }
             count++;
         }
-        for(int i = 1; i <= count / 2; i++){
+        /*for(int i = 1; i <= count / 2; i++){
             float curM = hashMapM.get(i);
             sum += curM * hashMapN.get(i);
             myKey.set(key.getI());
             myFloatValuePair.set(1, i, curM);
             outputCollector.collect(myKey, myFloatValuePair);
+        }*/
+        for (int k : hashMapM.keySet()) {
+            if (hashMapN.containsKey(k)) {
+                sum += hashMapM.get(k) * hashMapN.get(k);
+                myFloatValuePair.set(1, k, hashMapM.get(k));
+                outputCollector.collect(myKey, myFloatValuePair);
+            }
         }
 
 
