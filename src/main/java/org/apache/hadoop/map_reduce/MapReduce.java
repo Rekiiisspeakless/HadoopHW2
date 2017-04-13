@@ -2,6 +2,7 @@ package org.apache.hadoop.map_reduce;
 
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.StringTokenizer;
 import java.util.Vector;
 
@@ -11,26 +12,29 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.FloatWritable;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapred.*;
 import org.apache.hadoop.mapreduce.Job;
-import org.apache.hadoop.mapreduce.Mapper;
-import org.apache.hadoop.mapreduce.Reducer;
-import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
-import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+//import org.apache.hadoop.mapreduce.Mapper;
+//import org.apache.hadoop.mapreduce.Reducer;
+
+//import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+//import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.util.GenericOptionsParser;
 
 public class MapReduce {
 
     public static class MatrixConstructMapper
-        extends Mapper<Object, Text, IntWritable, IntWritable>{
+        extends MapReduceBase implements Mapper<Object, Text, IntWritable, IntWritable> {
         private  IntWritable from = new IntWritable();
         private  IntWritable to = new IntWritable();
-    public void map(Object key, Text value, Context context
-                    ) throws IOException, InterruptedException {
+    public void map(Object key, Text value, OutputCollector <IntWritable, IntWritable> outputCollector,
+                    Reporter reporter
+                    ) throws IOException{
         StringTokenizer itr = new StringTokenizer(value.toString(), " ");
         int nodeNum = 5;
         from.set(Integer.valueOf(itr.nextToken()));
         to.set(Integer.valueOf(itr.nextToken()));
-        context.write(from, to);
+        outputCollector.collect(from, to);
     }
 }
 
@@ -38,13 +42,13 @@ public class MapReduce {
 
 
 public static class MatrixConstructReducer
-        extends Reducer<IntWritable,IntWritable,MyKeyPair,MyFloatValuePair2> {
+        extends MapReduceBase implements Reducer<IntWritable,IntWritable,MyKeyPair,MyFloatValuePair2> {
     private  MyKeyPair myKeyPair = new MyKeyPair();
     private MyFloatValuePair2 myFloatValuePair2 = new MyFloatValuePair2();
 
-    public void reduce(IntWritable key, Iterable<IntWritable> values,
-                        Context context
-                        ) throws IOException, InterruptedException{
+    public void reduce(IntWritable key, Iterator<IntWritable> values,
+                        OutputCollector <MyKeyPair, MyFloatValuePair2> outputCollector, Reporter reporter
+                        ) throws IOException{
         int totalNodeNum = 5;
         Vector<Integer> tos = new Vector<Integer>();
         int nodeNum = 0;
@@ -52,7 +56,8 @@ public static class MatrixConstructReducer
         for(int i = 1; i <= totalNodeNum; ++i){
             tos.setElementAt(0, i);
         }
-        for(IntWritable val : values){
+        while (values.hasNext()){
+            IntWritable val = values.next();
             tos.setElementAt(1, val.get());
             nodeNum ++;
         }
@@ -66,26 +71,27 @@ public static class MatrixConstructReducer
             Integer cur = tos.get(i);
             if(cur == 1){
                 myFloatValuePair2.set(1, (float)cur / nodeNum * beta + (1-beta) / totalNodeNum);
-                context.write(myKeyPair, myFloatValuePair2);
+                outputCollector.collect(myKeyPair, myFloatValuePair2);
                 myFloatValuePair2.set(2, (float)1 / totalNodeNum);
-                context.write(myKeyPair, myFloatValuePair2);
+                outputCollector.collect(myKeyPair, myFloatValuePair2);
             } else{
                 myFloatValuePair2.set(1, (1-beta) / totalNodeNum);
-                context.write(myKeyPair, myFloatValuePair2);
+                outputCollector.collect(myKeyPair, myFloatValuePair2);
                 myFloatValuePair2.set(2, (float)1 / totalNodeNum);
-                context.write(myKeyPair, myFloatValuePair2);
+                outputCollector.collect(myKeyPair, myFloatValuePair2);
             }
         }
     }
 }
 
 public static class PageRankMultiplyMapper
-    extends Mapper<MyKeyPair, MyFloatValuePair2, MyKeyPair, MyFloatValuePair>{
+    extends MapReduceBase implements Mapper<MyKeyPair, MyFloatValuePair2, MyKeyPair, MyFloatValuePair>{
     private MyKeyPair keyPair = new MyKeyPair();
     private MyFloatValuePair valuePair = new MyFloatValuePair();
 
-    public void map(MyKeyPair key, MyFloatValuePair2 value, Context context
-    ) throws IOException, InterruptedException {
+    public void map(MyKeyPair key, MyFloatValuePair2 value, OutputCollector outputCollector,
+                    Reporter reporter
+    ) throws IOException{
         int nameValue = -1, index1 = -1, index2 = -1;
         float val;
 
@@ -103,11 +109,11 @@ public static class PageRankMultiplyMapper
                 /*message += "( " + String.valueOf(keyPair.getI()) + "," + String.valueOf(keyPair.getK()) + " ) ";
                 message += "( " + String.valueOf(valuePair.getName()) + "," + String.valueOf(valuePair.getIndex1())
                         + "," +  String.valueOf(valuePair.getIndex2()) + " )\n";*/
-                context.write(keyPair, valuePair);
+                outputCollector.collect(keyPair, valuePair);
             } else {
                 keyPair.set(k, index2);
                 valuePair.set(nameValue, index1, val);
-                context.write(keyPair, valuePair);
+                outputCollector.collect(keyPair, valuePair);
                 /*message += "( " + String.valueOf(keyPair.getI()) + "," + String.valueOf(keyPair.getK()) + " ) ";
                 message += "( " + String.valueOf(valuePair.getName()) + "," + String.valueOf(valuePair.getIndex1())
                         + "," +  String.valueOf(valuePair.getIndex2()) + " )\n";*/
@@ -119,20 +125,21 @@ public static class PageRankMultiplyMapper
 }
 
 public static class IntSumReducer
-        extends Reducer<MyKeyPair,MyFloatValuePair, IntWritable, MyFloatValuePair> {
+        extends MapReduceBase implements Reducer<MyKeyPair,MyFloatValuePair, IntWritable, MyFloatValuePair> {
     private IntWritable myKey = new IntWritable();
     private  MyFloatValuePair myFloatValuePair = new MyFloatValuePair();
 
 
-    public void reduce(MyKeyPair key, Iterable<MyFloatValuePair> values,
-                       Context context
-    ) throws IOException, InterruptedException{
+    public void reduce(MyKeyPair key, Iterator<MyFloatValuePair> values,
+                       OutputCollector <IntWritable, MyFloatValuePair> outputCollector, Reporter reporter
+    ) throws IOException{
         float sum = 0;
         int count = 0;
         HashMap<Integer, Float> hashMapM = new HashMap<Integer, Float>();
         HashMap<Integer, Float> hashMapN = new HashMap<Integer, Float>();
 
-        for(MyFloatValuePair val : values){
+        while(values.hasNext()){
+            MyFloatValuePair val = values.next();
             if(val.getName() == 1){
                 hashMapM.put(val.getIndex1(), val.getIndex2());
             }else{
@@ -145,46 +152,48 @@ public static class IntSumReducer
             sum += curM * hashMapN.get(i);
             myKey.set(key.getI());
             myFloatValuePair.set(1, i, curM);
-            context.write(myKey, myFloatValuePair);
+            outputCollector.collect(myKey, myFloatValuePair);
         }
 
 
         myKey.set(key.getI());
         myFloatValuePair.set(2, key.getK(), sum);
-        context.write(myKey, myFloatValuePair);
+        outputCollector.collect(myKey, myFloatValuePair);
     }
 }
 
 public static class PageRankDeadEndPreventMapper
-        extends Mapper<IntWritable, MyFloatValuePair, IntWritable, MyFloatValuePair> {
+        extends MapReduceBase implements   Mapper<IntWritable, MyFloatValuePair, IntWritable, MyFloatValuePair> {
 
 
-    public void map(IntWritable key, MyFloatValuePair value, Context context
-    ) throws IOException, InterruptedException {
-        context.write(key, value);
+    public void map(IntWritable key, MyFloatValuePair value,
+                    OutputCollector<IntWritable, MyFloatValuePair> outputCollector, Reporter reporter
+    ) throws IOException {
+        outputCollector.collect(key, value);
     }
 }
 
 
 public static class PageRankDeadEndPreventReducer
-        extends Reducer<IntWritable, MyFloatValuePair, MyKeyPair, MyFloatValuePair2> {
+        extends MapReduceBase implements Reducer<IntWritable, MyFloatValuePair, MyKeyPair, MyFloatValuePair2> {
 
         private  MyFloatValuePair2 myFloatValuePair2 = new MyFloatValuePair2();
         private MyKeyPair myKeyPair = new MyKeyPair();
 
-    public void reduce(IntWritable key, Iterable<MyFloatValuePair> values,
-                       Context context
-    ) throws IOException, InterruptedException{
+    public void reduce(IntWritable key, Iterator<MyFloatValuePair> values,
+                       OutputCollector<MyKeyPair, MyFloatValuePair2> outputCollector, Reporter reporter
+    ) throws IOException{
         HashMap<MyKeyPair, Float> hashMapM = new HashMap<MyKeyPair, Float>();
         HashMap<Integer, Float> hashMapN = new HashMap<Integer, Float>();
         int count = 0;
         float s = 0;
-        for(MyFloatValuePair val : values){
+        while(values.hasNext()){
+            MyFloatValuePair val = values.next();
             if(val.getName() == 1){
                 MyKeyPair keyPair = new MyKeyPair(key.get(), val.getIndex1());
                 if(!hashMapM.containsKey(keyPair)){
                     myFloatValuePair2.set(1, val.getIndex2());
-                    context.write(keyPair,   myFloatValuePair2);
+                    outputCollector.collect(keyPair,   myFloatValuePair2);
                     hashMapM.put(keyPair, val.getIndex2());
                 }
             }else{
@@ -197,21 +206,22 @@ public static class PageRankDeadEndPreventReducer
             float rNew = hashMapN.get(i) + (1 - s) / 2;
             myFloatValuePair2.set(2, rNew);
             myKeyPair.set(key.get(), i);
-            context.write(myKeyPair, myFloatValuePair2);
+            outputCollector.collect(myKeyPair, myFloatValuePair2);
         }
     }
 }
 
 public static class OutputMapper
-        extends Mapper<MyKeyPair, MyFloatValuePair2, IntWritable, FloatWritable> {
+        extends MapReduceBase implements   Mapper<MyKeyPair, MyFloatValuePair2, IntWritable, FloatWritable> {
     private  IntWritable myKey = new IntWritable();
     private  FloatWritable myValue = new FloatWritable();
 
-    public void map(MyKeyPair key, MyFloatValuePair2 value, Context context
-    ) throws IOException, InterruptedException {
+    public void map(MyKeyPair key, MyFloatValuePair2 value, OutputCollector <IntWritable, FloatWritable> outputCollector,
+                    Reporter reporter
+    ) throws IOException{
         myKey.set(key.getI());
         myValue.set(value.getIndex2());
-        context.write(myKey, myValue);
+        outputCollector.collect(myKey, myValue);
     }
 }
 
@@ -226,7 +236,9 @@ public static void main(String[] args) throws Exception {
 
     ////////////////////////job1///////////////////////////
 
-    Job job1 = new Job(conf, "matrix construct");
+    //Job job1 = new Job(conf, "matrix construct");
+    JobConf job1 = new JobConf();
+    job1.setJobName("matrix construct");
     job1.setJarByClass(MapReduce.class);
     job1.setMapperClass(MatrixConstructMapper.class);
     //job.setCombinerClass(IntSumReducer.class);
@@ -241,14 +253,17 @@ public static void main(String[] args) throws Exception {
     /*job.setOutputKeyClass(MyKeyPair.class);
     job.setOutputValueClass(MyValuePair.class);*/
 
-    FileInputFormat.addInputPath(job1, new Path(otherArgs[0]));
-    FileOutputFormat.setOutputPath(job1, new Path("/user/root/data/hw2/map"));
+    FileInputFormat.setInputPaths(job1, new Path(otherArgs[0]));
+    FileOutputFormat.setOutputPath(job1, new Path("/user/root/data/hw2/job1"));
+
+    JobClient.runJob(job1);
 
     ////////////////////loop start//////////////////////////
 
     ////////////////////////job2///////////////////////////
 
-    Job job2 = new Job(conf, "page rank matrix multiply");
+    JobConf job2 = new JobConf( );
+    job2.setJobName("page rank matrix multiply");
     job2.setJarByClass(MapReduce.class);
     job2.setMapperClass(PageRankMultiplyMapper.class);
     //job.setCombinerClass(IntSumReducer.class);
@@ -263,12 +278,15 @@ public static void main(String[] args) throws Exception {
     /*job.setOutputKeyClass(MyKeyPair.class);
     job.setOutputValueClass(MyValuePair.class);*/
 
-    FileInputFormat.addInputPath(job2, new Path("/user/root/data/hw2"));
-    FileOutputFormat.setOutputPath(job2, new Path("/user/root/data/hw2"));
+    FileInputFormat.addInputPath(job2, new Path("/user/root/data/hw2/job1"));
+    FileOutputFormat.setOutputPath(job2, new Path("/user/root/data/hw2/job2"));
+
+    JobClient.runJob(job2);
 
     ////////////////////////job3///////////////////////////
 
-    Job job3 = new Job(conf, "prevent dead end");
+    //Job job3 = new Job(conf, "prevent dead end");
+    JobConf job3 = new JobConf();
     job3.setJarByClass(MapReduce.class);
     job3.setMapperClass(PageRankDeadEndPreventMapper.class);
     //job.setCombinerClass(IntSumReducer.class);
@@ -283,11 +301,15 @@ public static void main(String[] args) throws Exception {
     /*job.setOutputKeyClass(MyKeyPair.class);
     job.setOutputValueClass(MyValuePair.class);*/
 
-    FileInputFormat.addInputPath(job3, new Path("/user/root/data/hw2"));
-    FileOutputFormat.setOutputPath(job3, new Path("/user/root/data/hw2"));
+    FileInputFormat.addInputPath(job3, new Path("/user/root/data/hw2/job2"));
+    FileOutputFormat.setOutputPath(job3, new Path("/user/root/data/hw2/job3"));
+
+    JobClient.runJob(job3);
 
     /////////////////////job4/////////////////////////////
-    Job job4 = new Job(conf, "output page rank");
+    //Job job4 = new Job(conf, "output page rank");
+    JobConf job4 = new JobConf();
+    job4.setJobName("output page rank");
     job4.setJarByClass(MapReduce.class);
     job4.setMapperClass(OutputMapper.class);
     //job.setCombinerClass(IntSumReducer.class);
@@ -302,11 +324,14 @@ public static void main(String[] args) throws Exception {
     /*job.setOutputKeyClass(MyKeyPair.class);
     job.setOutputValueClass(MyValuePair.class);*/
 
-    FileInputFormat.addInputPath(job4, new Path("/user/root/data/hw2"));
+    FileInputFormat.addInputPath(job4, new Path("/user/root/data/hw2/job3"));
     FileOutputFormat.setOutputPath(job4, new Path(otherArgs[1]));
 
+    JobClient.runJob(job4);
 
 
-    System.exit(job4.waitForCompletion(true) ? 0 : 1);
+
+
+    //System.exit(job4.waitForCompletion(true) ? 0 : 1);
     }
 }
