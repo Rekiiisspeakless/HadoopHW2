@@ -42,12 +42,12 @@ public class MapReduce {
 
 
 public static class MatrixConstructReducer
-        extends MapReduceBase implements Reducer<IntWritable,IntWritable,MyKeyPair,MyFloatValuePair2> {
+        extends MapReduceBase implements Reducer<IntWritable,IntWritable,Object,Text> {
     private  MyKeyPair myKeyPair = new MyKeyPair();
     private MyFloatValuePair2 myFloatValuePair2 = new MyFloatValuePair2();
 
     public void reduce(IntWritable key, Iterator<IntWritable> values,
-                        OutputCollector <MyKeyPair, MyFloatValuePair2> outputCollector, Reporter reporter
+                        OutputCollector <Object, Text> outputCollector, Reporter reporter
                         ) throws IOException{
         int totalNodeNum = 5;
         Vector<Integer> tos = new Vector<Integer>();
@@ -70,36 +70,48 @@ public static class MatrixConstructReducer
 
             Integer cur = tos.get(i);
             if(cur == 1){
-                myFloatValuePair2.set(1, (float)cur / nodeNum * beta + (1-beta) / totalNodeNum);
-                outputCollector.collect(myKeyPair, myFloatValuePair2);
-                myFloatValuePair2.set(2, (float)1 / totalNodeNum);
-                outputCollector.collect(myKeyPair, myFloatValuePair2);
+                //myFloatValuePair2.set(1, (float)cur / nodeNum * beta + (1-beta) / totalNodeNum);
+                //outputCollector.collect(myKeyPair, myFloatValuePair2);
+                //myFloatValuePair2.set(2, (float)1 / totalNodeNum);
+                //outputCollector.collect(myKeyPair, myFloatValuePair2);
+                String s = key.get() + "," + i + "," + "1," + String.valueOf((float)cur / nodeNum * beta + (1-beta) / totalNodeNum);
+                outputCollector.collect(null, new Text(s));
+                s = key.get() + "," + i + "," + "2," + String.valueOf((float)1 / totalNodeNum);
+                outputCollector.collect(null, new Text(s));
             } else{
-                myFloatValuePair2.set(1, (1-beta) / totalNodeNum);
-                outputCollector.collect(myKeyPair, myFloatValuePair2);
-                myFloatValuePair2.set(2, (float)1 / totalNodeNum);
-                outputCollector.collect(myKeyPair, myFloatValuePair2);
+                //myFloatValuePair2.set(1, (1-beta) / totalNodeNum);
+                //outputCollector.collect(myKeyPair, myFloatValuePair2);
+                //myFloatValuePair2.set(2, (float)1 / totalNodeNum);
+                //outputCollector.collect(myKeyPair, myFloatValuePair2);
+                String s = key.get() + "," + i + "," + "1," + String.valueOf((1-beta) / totalNodeNum);
+                outputCollector.collect(null, new Text(s));
+                s = key.get() + "," + i + "," + "2," + String.valueOf((float)1 / totalNodeNum);
+                outputCollector.collect(null, new Text(s));
             }
         }
     }
 }
 
 public static class PageRankMultiplyMapper
-    extends MapReduceBase implements Mapper<MyKeyPair, MyFloatValuePair2, MyKeyPair, MyFloatValuePair>{
+    extends MapReduceBase implements Mapper<Object, Text, MyKeyPair, MyFloatValuePair>{
     private MyKeyPair keyPair = new MyKeyPair();
     private MyFloatValuePair valuePair = new MyFloatValuePair();
 
-    public void map(MyKeyPair key, MyFloatValuePair2 value, OutputCollector outputCollector,
+    public void map(Object key, Text value, OutputCollector outputCollector,
                     Reporter reporter
     ) throws IOException{
         int nameValue = -1, index1 = -1, index2 = -1;
         float val;
-
-        nameValue = value.getIndex1();
+        String token[] = value.toString().split(",");
+        /*nameValue = value.getIndex1();
 
         index1 = key.getI();
         index2 = key.getK();
-        val = value.getIndex2();
+        val = value.getIndex2();*/
+        index1 = Integer.parseInt(token[0]);
+        index2 = Integer.parseInt(token[1]);
+        nameValue = Integer.parseInt(token[2]);
+        val = Float.valueOf(token[3]);
 
 
         for (int k = 1; k <= 5; k++) {
@@ -125,13 +137,13 @@ public static class PageRankMultiplyMapper
 }
 
 public static class IntSumReducer
-        extends MapReduceBase implements Reducer<MyKeyPair,MyFloatValuePair, IntWritable, MyFloatValuePair> {
+        extends MapReduceBase implements Reducer<MyKeyPair,MyFloatValuePair, Object, Text> {
     private IntWritable myKey = new IntWritable();
     private  MyFloatValuePair myFloatValuePair = new MyFloatValuePair();
 
 
     public void reduce(MyKeyPair key, Iterator<MyFloatValuePair> values,
-                       OutputCollector <IntWritable, MyFloatValuePair> outputCollector, Reporter reporter
+                       OutputCollector <Object, Text> outputCollector, Reporter reporter
     ) throws IOException{
         float sum = 0;
         int count = 0;
@@ -158,37 +170,43 @@ public static class IntSumReducer
             if (hashMapN.containsKey(k)) {
                 sum += hashMapM.get(k) * hashMapN.get(k);
                 myFloatValuePair.set(1, k, hashMapM.get(k));
-                outputCollector.collect(myKey, myFloatValuePair);
+                String s = key.getI() + "," + 1 + "," + k + "," + hashMapM.get(k);
+                outputCollector.collect(null, new Text(s));
             }
         }
 
 
-        myKey.set(key.getI());
-        myFloatValuePair.set(2, key.getK(), sum);
-        outputCollector.collect(myKey, myFloatValuePair);
+        /*myKey.set(key.getI());
+        myFloatValuePair.set(2, key.getK(), sum);*/
+        String s = key.getI() + "," + 2 + "," + key.getK() + "," + sum;
+        outputCollector.collect(null, new Text(s));
     }
 }
 
 public static class PageRankDeadEndPreventMapper
-        extends MapReduceBase implements   Mapper<IntWritable, MyFloatValuePair, IntWritable, MyFloatValuePair> {
+        extends MapReduceBase implements   Mapper<Object, Text, IntWritable, MyFloatValuePair> {
 
-
-    public void map(IntWritable key, MyFloatValuePair value,
+    IntWritable intWritable = new IntWritable();
+    MyFloatValuePair myFloatValuePair = new MyFloatValuePair();
+    public void map(Object key, Text value,
                     OutputCollector<IntWritable, MyFloatValuePair> outputCollector, Reporter reporter
     ) throws IOException {
-        outputCollector.collect(key, value);
+        String token[] = value.toString().split(",");
+        intWritable.set(Integer.valueOf(token[0]));
+        myFloatValuePair.set(Integer.valueOf(token[1]),Integer.valueOf(token[2]), Float.valueOf(token[3]));
+        outputCollector.collect(intWritable, myFloatValuePair);
     }
 }
 
 
 public static class PageRankDeadEndPreventReducer
-        extends MapReduceBase implements Reducer<IntWritable, MyFloatValuePair, MyKeyPair, MyFloatValuePair2> {
+        extends MapReduceBase implements Reducer<IntWritable, MyFloatValuePair, Object, Text> {
 
         private  MyFloatValuePair2 myFloatValuePair2 = new MyFloatValuePair2();
         private MyKeyPair myKeyPair = new MyKeyPair();
 
     public void reduce(IntWritable key, Iterator<MyFloatValuePair> values,
-                       OutputCollector<MyKeyPair, MyFloatValuePair2> outputCollector, Reporter reporter
+                       OutputCollector<Object, Text> outputCollector, Reporter reporter
     ) throws IOException{
         HashMap<MyKeyPair, Float> hashMapM = new HashMap<MyKeyPair, Float>();
         HashMap<Integer, Float> hashMapN = new HashMap<Integer, Float>();
@@ -199,8 +217,10 @@ public static class PageRankDeadEndPreventReducer
             if(val.getName() == 1){
                 MyKeyPair keyPair = new MyKeyPair(key.get(), val.getIndex1());
                 if(!hashMapM.containsKey(keyPair)){
-                    myFloatValuePair2.set(1, val.getIndex2());
-                    outputCollector.collect(keyPair,   myFloatValuePair2);
+                    //myFloatValuePair2.set(1, val.getIndex2());
+                    //outputCollector.collect(keyPair,   myFloatValuePair2);
+                    String output = key.get() + "," + val.getIndex1() + "," + 1 + "," + val.getIndex2();
+                    outputCollector.collect(null ,new Text(output));
                     hashMapM.put(keyPair, val.getIndex2());
                 }
             }else{
@@ -213,21 +233,26 @@ public static class PageRankDeadEndPreventReducer
             float rNew = hashMapN.get(i) + (1 - s) / 2;
             myFloatValuePair2.set(2, rNew);
             myKeyPair.set(key.get(), i);
-            outputCollector.collect(myKeyPair, myFloatValuePair2);
+            //outputCollector.collect(myKeyPair, myFloatValuePair2);
+            String output = key.get() + "," + i + "," + 2 + "," + rNew;
+            outputCollector.collect(null, new Text(output));
         }
     }
 }
 
 public static class OutputMapper
-        extends MapReduceBase implements   Mapper<MyKeyPair, MyFloatValuePair2, IntWritable, FloatWritable> {
+        extends MapReduceBase implements   Mapper<Object, Text, IntWritable, FloatWritable> {
     private  IntWritable myKey = new IntWritable();
     private  FloatWritable myValue = new FloatWritable();
 
-    public void map(MyKeyPair key, MyFloatValuePair2 value, OutputCollector <IntWritable, FloatWritable> outputCollector,
+    public void map(Object key, Text value, OutputCollector <IntWritable, FloatWritable> outputCollector,
                     Reporter reporter
     ) throws IOException{
-        myKey.set(key.getI());
-        myValue.set(value.getIndex2());
+        String token[] = value.toString().split(",");
+        /*myKey.set(key.getI());
+        myValue.set(value.getIndex2());*/
+        myKey.set(Integer.valueOf(token[0]));
+        myValue.set(Float.valueOf(token[3]));
         outputCollector.collect(myKey, myValue);
     }
 }
@@ -254,8 +279,8 @@ public static void main(String[] args) throws Exception {
     job1.setMapOutputKeyClass(IntWritable.class);
     job1.setMapOutputValueClass(IntWritable.class);
 
-    job1.setOutputKeyClass(MyValuePair.class);
-    job1.setOutputValueClass(FloatWritable.class);
+    job1.setOutputKeyClass(Object.class);
+    job1.setOutputValueClass(Text.class);
 
     /*job.setOutputKeyClass(MyKeyPair.class);
     job.setOutputValueClass(MyValuePair.class);*/
@@ -279,8 +304,8 @@ public static void main(String[] args) throws Exception {
     job2.setMapOutputKeyClass(MyKeyPair.class);
     job2.setMapOutputValueClass(MyFloatValuePair.class);
 
-    job2.setOutputKeyClass(IntWritable.class);
-    job2.setOutputValueClass(MyFloatValuePair.class);
+    job2.setOutputKeyClass(Object.class);
+    job2.setOutputValueClass(Text.class);
 
     /*job.setOutputKeyClass(MyKeyPair.class);
     job.setOutputValueClass(MyValuePair.class);*/
@@ -302,8 +327,8 @@ public static void main(String[] args) throws Exception {
     job3.setMapOutputKeyClass(IntWritable.class);
     job3.setMapOutputValueClass(MyFloatValuePair.class);
 
-    job3.setOutputKeyClass(MyKeyPair.class);
-    job3.setOutputValueClass(MyFloatValuePair2.class);
+    job3.setOutputKeyClass(Object.class);
+    job3.setOutputValueClass(Text.class);
 
     /*job.setOutputKeyClass(MyKeyPair.class);
     job.setOutputValueClass(MyValuePair.class);*/
